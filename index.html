@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>کتابخانه هشت بهشت | پنل کتابدار</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        * { font-family: 'Vazirmatn', 'Tahoma', sans-serif; }
+        /* پس‌زمینه به حالت زیبای اولیه (گرادیان آبی-بنفش) */
+        body {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            padding: 20px;
+        }
+        .library-header {
+            background: rgba(255,255,255,0.15);
+            backdrop-filter: blur(10px);
+            border-radius: 60px;
+            padding: 15px 25px;
+            margin-bottom: 30px;
+            color: white;
+        }
+        .card {
+            border-radius: 28px;
+            margin-bottom: 25px;
+            background: rgba(255,255,255,0.95);
+            box-shadow: 0 20px 35px -12px rgba(0,0,0,0.2);
+        }
+        .card-header {
+            background: linear-gradient(90deg, #2c3e50, #3498db);
+            color: white;
+            border-radius: 28px 28px 0 0;
+        }
+        .btn { border-radius: 40px; padding: 5px 18px; margin: 3px; }
+        .btn-primary { background: #2c3e50; border: none; }
+        .stats-card {
+            background: rgba(255,255,255,0.9);
+            border-radius: 24px;
+            padding: 20px;
+            text-align: center;
+        }
+        .stats-number { font-size: 2.2rem; font-weight: 800; color: #2c3e50; }
+        /* تب‌های دسته‌بندی */
+        .category-tab {
+            border-radius: 50px;
+            margin: 0 5px;
+            padding: 8px 22px;
+            background: #f0f2f5;
+            border: none;
+            transition: 0.2s;
+            font-weight: 500;
+        }
+        .category-tab.active {
+            color: white;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .category-tab[data-category="همه"].active { background: #6c757d; }
+        .category-tab[data-category="رمان"].active { background: #d63384; }
+        .category-tab[data-category="علمی"].active { background: #198754; }
+        .category-tab[data-category="تاریخی"].active { background: #fd7e14; }
+        .category-tab[data-category="فنی"].active { background: #0d6efd; }
+        .category-tab[data-category="اشعار"].active { background: #a0522d; }
+        /* استایل جدول */
+        table { border-radius: 20px; overflow: hidden; width: 100%; transition: background-color 0.2s; }
+        th { background: #e9ecef; color: #2c3e50; text-align: center; }
+        td, th { text-align: center; vertical-align: middle; padding: 10px; }
+        .search-box {
+            border-radius: 50px;
+            padding: 10px 20px;
+            border: 1px solid #ced4da;
+            width: 100%;
+        }
+        footer { text-align: center; margin-top: 40px; color: rgba(255,255,255,0.7); }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="library-header d-flex justify-content-between align-items-center flex-wrap">
+        <div>
+            <h2><i class="fas fa-book-open"></i> کتابخانه هشت بهشت</h2>
+            <p>مدیریت هوشمند امانت، رزرو و جریمه</p>
+        </div>
+        <div><span class="badge bg-light text-dark p-2"><i class="fas fa-calendar-alt"></i> امروز: <span id="todayDate"></span></span></div>
+    </div>
+
+    <!-- آمار -->
+    <div class="row mb-4 g-3">
+        <div class="col-md-3"><div class="stats-card"><i class="fas fa-book fa-2x text-primary"></i><div class="stats-number" id="totalBooks">0</div><div>کل کتاب‌ها</div></div></div>
+        <div class="col-md-3"><div class="stats-card"><i class="fas fa-hand-holding-heart fa-2x text-success"></i><div class="stats-number" id="activeLoansCount">0</div><div>امانت فعال</div></div></div>
+        <div class="col-md-3"><div class="stats-card"><i class="fas fa-clock fa-2x text-warning"></i><div class="stats-number" id="overdueCount">0</div><div>دیرکرد</div></div></div>
+        <div class="col-md-3"><div class="stats-card"><i class="fas fa-users fa-2x text-danger"></i><div class="stats-number" id="reserveCount">0</div><div>در صف انتظار</div></div></div>
+    </div>
+
+    <!-- افزودن کتاب -->
+    <div class="card">
+        <div class="card-header"><i class="fas fa-plus-circle"></i> افزودن کتاب جدید</div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-5"><input type="text" id="itemName" class="form-control" placeholder="نام کتاب"></div>
+                <div class="col-md-3"><select id="itemCategory" class="form-select">
+                    <option>رمان</option><option>علمی</option><option>تاریخی</option><option>فنی</option><option>اشعار</option>
+                </select></div>
+                <div class="col-md-2"><input type="number" id="itemQty" class="form-control" placeholder="تعداد"></div>
+                <div class="col-md-2"><button class="btn btn-success w-100" onclick="addItem()">ذخیره کتاب</button></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- جستجو -->
+    <div class="mb-3">
+        <input type="text" id="searchInput" class="search-box" placeholder="🔍 جستجوی کتاب (نام کتاب را وارد کنید)...">
+    </div>
+
+    <!-- تب‌های دسته‌بندی -->
+    <ul class="nav nav-tabs mb-3" id="categoryTabs">
+        <li class="nav-item"><button class="category-tab active" data-category="همه" onclick="filterBooks('همه')"><i class="fas fa-layer-group"></i> همه</button></li>
+        <li class="nav-item"><button class="category-tab" data-category="رمان" onclick="filterBooks('رمان')"><i class="fas fa-feather-alt"></i> رمان</button></li>
+        <li class="nav-item"><button class="category-tab" data-category="علمی" onclick="filterBooks('علمی')"><i class="fas fa-flask"></i> علمی</button></li>
+        <li class="nav-item"><button class="category-tab" data-category="تاریخی" onclick="filterBooks('تاریخی')"><i class="fas fa-landmark"></i> تاریخی</button></li>
+        <li class="nav-item"><button class="category-tab" data-category="فنی" onclick="filterBooks('فنی')"><i class="fas fa-microchip"></i> فنی</button></li>
+        <li class="nav-item"><button class="category-tab" data-category="اشعار" onclick="filterBooks('اشعار')"><i class="fas fa-pen-fancy"></i> اشعار</button></li>
+    </ul>
+
+    <!-- جدول کتاب‌ها -->
+    <div class="card">
+        <div class="card-header"><i class="fas fa-list"></i> لیست کتاب‌ها</div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover" id="itemsTable">
+                    <thead><tr><th>نام کتاب</th><th>موجودی</th><th>امانت</th><th>رزرو</th></tr></thead>
+                    <tbody id="itemsTableBody"><tr><td colspan="4">در حال بارگذاری...</td> </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- تب‌های مدیریتی -->
+    <ul class="nav nav-tabs mb-3" id="managementTabs">
+        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#active">امانت‌های فعال</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#history">تاریخچه امانت‌ها</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#reserve">صف انتظار (رزروها)</button></li>
+    </ul>
+
+    <div class="tab-content">
+        <div class="tab-pane fade show active" id="active"><div class="card"><div class="card-header bg-info">امانت‌های فعال</div><div class="card-body"><div class="table-responsive"><table class="table table-bordered" id="activeTable"><thead><tr><th>کتاب</th><th>گیرنده</th><th>تاریخ امانت</th><th>سررسید</th><th>وضعیت</th><th>عملیات</th></tr></thead><tbody><tr><td colspan="6">در حال بارگذاری...</td> </tbody></table></div></div></div></div>
+        <div class="tab-pane fade" id="history"><div class="card"><div class="card-header bg-dark">تاریخچه امانت‌ها</div><div class="card-body"><div class="table-responsive"><table class="table table-sm" id="historyTable"><thead><tr><th>کتاب</th><th>گیرنده</th><th>امانت</th><th>سررسید</th><th>برگشت</th><th>تأخیر</th><th>جریمه دیرکرد</th><th>جریمه آسیب</th><th>دلیل آسیب</th><th>مجموع</th></tr></thead><tbody></tbody></table></div></div></div></div>
+        <div class="tab-pane fade" id="reserve"><div class="card"><div class="card-header bg-warning">صف انتظار (رزروها)</div><div class="card-body"><div class="row mb-3"><div class="col-md-6"><select id="reserveBookSelect" class="form-select"><option>انتخاب کتاب...</option></select></div><div class="col-md-4"><input type="text" id="reserveUserName" class="form-control" placeholder="نام عضو"></div><div class="col-md-2"><button class="btn btn-warning w-100" onclick="registerReserve()">ثبت رزرو</button></div></div><div class="table-responsive"><table class="table table-bordered" id="reserveTable"><thead><tr><th>کتاب</th><th>عضو</th><th>تاریخ رزرو</th><th>جایگاه</th><th>وضعیت</th></tr></thead><tbody><tr><td colspan="5">در حال بارگذاری...</td> </tbody></table></div></div></div></div>
+    </div>
+    <footer><i class="fas fa-landmark"></i> کتابخانه هشت بهشت | مدیریت هوشمند با Flask و Bootstrap</footer>
+</div>
+
+<script>
+    let allItems = [];
+    let currentCategory = "همه";
+    document.getElementById('todayDate').innerText = new Date().toLocaleDateString('fa-IR');
+
+    // تابع تغییر رنگ جدول (مستقیم با style)
+    function setTableColor(category) {
+        let tableElem = document.getElementById("itemsTable");
+        let colorMap = {
+            "همه": "#ffffff",
+            "رمان": "#ffe6f0",
+            "علمی": "#e0f7e8",
+            "تاریخی": "#fff0e0",
+            "فنی": "#e3f2fd",
+            "اشعار": "#fce4d6"
+        };
+        let bgColor = colorMap[category] || "#ffffff";
+        tableElem.style.backgroundColor = bgColor;
+        // شفاف کردن رنگ ردیف‌ها (اختیاری)
+        let rows = tableElem.querySelectorAll('tbody tr');
+        rows.forEach(row => row.style.backgroundColor = 'transparent');
+    }
+
+    async function loadAll(){ await loadItems(); await loadActive(); await loadHistory(); await loadReservations(); await updateStats(); }
+    
+    async function loadItems(){
+        let res=await fetch('/items'); 
+        allItems = await res.json();
+        filterBooks(currentCategory);
+        let reserveSelect=document.getElementById("reserveBookSelect");
+        reserveSelect.innerHTML='<option value="">انتخاب کتاب...</option>';
+        for(let i of allItems){
+            reserveSelect.innerHTML+=`<option value="${i.id}">${i.name} (${i.available>0?`موجود:${i.available}`:'ناموجود'}) - صف:${i.queue_count}</option>`;
+        }
+    }
+    
+    function filterBooks(category){
+        currentCategory = category;
+        applyFilterAndRender();
+        // بروزرسانی تب فعال
+        document.querySelectorAll('.category-tab').forEach(btn => {
+            if(btn.getAttribute('data-category') === category) btn.classList.add('active');
+            else btn.classList.remove('active');
+        });
+        // تغییر رنگ جدول
+        setTableColor(category);
+    }
+    
+    function applyFilterAndRender(){
+        let filtered = allItems;
+        if(currentCategory !== "همه"){
+            filtered = filtered.filter(item => item.category === currentCategory);
+        }
+        let searchVal = document.getElementById("searchInput").value.trim().toLowerCase();
+        if(searchVal !== ""){
+            filtered = filtered.filter(item => item.name.toLowerCase().includes(searchVal));
+        }
+        let tbody = document.getElementById("itemsTableBody");
+        tbody.innerHTML = "";
+        for(let i of filtered){
+            let btn = i.available>0 ? `<button class="btn btn-primary btn-sm" onclick="borrowItem(${i.id},'${i.name}')">امانت</button>` : '<span class="badge bg-danger">ناموجود</span>';
+            let reserveBtn = i.available==0 ? `<button class="btn btn-warning btn-sm" onclick="quickReserve(${i.id},'${i.name}')">رزرو</button>` : '<button class="btn btn-outline-secondary btn-sm" disabled>موجود</button>';
+            tbody.innerHTML += `<tr><td class="fw-bold">${i.name}</td><td>${i.available}</td><td>${btn}</td><td>${reserveBtn}</td></tr>`;
+        }
+        if(filtered.length === 0) tbody.innerHTML = '<tr><td colspan="4">کتابی یافت نشد</td></tr>';
+        // پس از رندر، رنگ زمینه جدول دوباره اعمال شود
+        setTableColor(currentCategory);
+    }
+    
+    document.getElementById("searchInput").addEventListener("input", function(){ applyFilterAndRender(); });
+    
+    function quickReserve(id,name){ let user=prompt(`رزرو "${name}" - نام عضو را وارد کنید:`); if(!user) return; fetch('/reserve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({item_id:id,user_name:user})}).then(res=>res.json()).then(r=>{alert(r.message); loadAll();}); }
+    async function registerReserve(){ let bookId=document.getElementById("reserveBookSelect").value, userName=document.getElementById("reserveUserName").value; if(!bookId||!userName){ alert("لطفاً کتاب و نام عضو را انتخاب کنید"); return; } let res=await fetch('/reserve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({item_id:parseInt(bookId),user_name:userName})}); let r=await res.json(); alert(r.message); document.getElementById("reserveUserName").value=""; loadAll(); }
+    async function borrowItem(id,name){ let user=prompt(`امانت "${name}" - نام عضو را وارد کنید:`); if(!user) return; let res=await fetch('/borrow',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({item_id:id,user_name:user})}); let r=await res.json(); if(r.status=='ok'){ alert(`امانت ثبت شد\nسررسید: ${r.due_date}`); loadAll(); } else alert("خطا: "+r.message); }
+    async function returnLoan(id){ let damageFine=prompt("جریمه آسیب (تومان):",0); let damageDesc=prompt("توضیح آسیب:", "ندارد"); if(!confirm("برگشت ثبت شود؟")) return; let res=await fetch('/return',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({loan_id:id,damage_fine:parseInt(damageFine),damage_desc:damageDesc})}); let r=await res.json(); if(r.status=='ok'){ alert(r.message); loadAll(); } else alert("خطا: "+r.message); }
+    async function renewLoan(id){ let user=prompt("تمدید امانت - نام عضو را وارد کنید:"); if(!user) return; let res=await fetch('/renew',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({loan_id:id,user_name:user})}); let r=await res.json(); if(r.status=='ok'){ alert(r.message); loadAll(); } else alert("خطا: "+r.message); }
+    async function loadActive(){ let res=await fetch('/active_loans'); let loans=await res.json(); let tbody=document.querySelector("#activeTable tbody"); tbody.innerHTML=""; for(let l of loans){ let statusClass=l.days_left>=0?"text-success":"text-danger"; let statusText=l.days_left>=0?`${l.days_left} روز باقی`:`${-l.days_left} روز گذشته`; let renewBtn=(l.renew_count<2)?`<button class="btn btn-warning btn-sm" onclick="renewLoan(${l.loan_id})">تمدید</button>`:'<span class="badge bg-secondary">تمدید نشدنی</span>'; tbody.innerHTML+=`<tr><td class="fw-bold">${l.item_name}</td><td>${l.user_name}</td><td>${l.loan_date}</td><td>${l.due_date}</td><td class="${statusClass} fw-bold">${statusText}</td><td>${renewBtn} <button class="btn btn-success btn-sm" onclick="returnLoan(${l.loan_id})">برگشت</button></td></tr>`; } if(loans.length===0) tbody.innerHTML='<tr><td colspan="6">هیچ امانت فعالی وجود ندارد</td></tr>'; }
+    async function loadHistory(){ let res=await fetch('/history'); let hist=await res.json(); let tbody=document.querySelector("#historyTable tbody"); tbody.innerHTML=""; for(let h of hist){ let delayText = h.days_late > 0 ? `${h.days_late} روز دیرتر` : (h.return_date !== '---' ? 'به موقع' : '---'); tbody.innerHTML+=`<tr><td class="fw-bold">${h.item_name}</td><td>${h.user_name}</td><td>${h.loan_date}</td><td>${h.due_date}</td><td>${h.return_date}</td><td class="${h.days_late>0?'text-danger fw-bold':'text-success'}">${delayText}</td><td>${h.late_fine}</td><td>${h.damage_fine}</td><td class="text-danger">${h.damage_desc}</td><td class="text-danger fw-bold">${h.total_fine}</td></tr>`; } }
+    async function loadReservations(){ let res=await fetch('/reservations'); let reserves=await res.json(); let tbody=document.querySelector("#reserveTable tbody"); tbody.innerHTML=""; for(let r of reserves){ let notifiedBadge = r.notified=='yes' ? '<span class="badge bg-success">اطلاع‌رسانی شد</span>' : '<span class="badge bg-warning">در انتظار</span>'; tbody.innerHTML+=`<tr><td class="fw-bold">${r.item_name}</td><td>${r.user_name}</td><td>${r.reserve_date}</td><td><span class="badge bg-danger">#${r.position}</span></td><td>${notifiedBadge}</td></tr>`; } if(reserves.length===0) tbody.innerHTML='<tr><td colspan="5">هیچ رزرو فعالی وجود ندارد</td></tr>'; }
+    async function updateStats(){ let items=await fetch('/items').then(r=>r.json()); let loans=await fetch('/active_loans').then(r=>r.json()); let reserves=await fetch('/reservations').then(r=>r.json()); document.getElementById("totalBooks").innerText=items.length; document.getElementById("activeLoansCount").innerText=loans.length; document.getElementById("overdueCount").innerText=loans.filter(l=>l.days_left<0).length; document.getElementById("reserveCount").innerText=reserves.length; }
+    async function addItem(){ let name=document.getElementById("itemName").value, category=document.getElementById("itemCategory").value, qty=document.getElementById("itemQty").value; if(!name||!qty){ alert("نام و تعداد را وارد کنید"); return; } await fetch('/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name,category:category,available:parseInt(qty)})}); document.getElementById("itemName").value=""; document.getElementById("itemQty").value=""; loadItems(); }
+    loadAll();
+    setInterval(loadAll, 30000);
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
