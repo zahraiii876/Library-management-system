@@ -91,6 +91,7 @@ def borrow():
     if not user_name:
         return jsonify({'status': 'error', 'message': 'نام امانت‌گیرنده الزامی است'})
     
+    # خواندن کتاب‌ها
     rows = []
     with open(CSV_FILE, newline='', encoding='utf-8') as f:
         reader = csv.reader(f)
@@ -110,18 +111,42 @@ def borrow():
     if available <= 0:
         return jsonify({'status': 'error', 'message': 'موجودی کافی نیست'})
     
+    # کاهش موجودی
     rows[item_idx][3] = str(available - 1)
     with open(CSV_FILE, 'w', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
         writer.writerow(header)
         writer.writerows(rows)
     
+    # ثبت امانت
     loan_id = get_next_id(LOANS_FILE)
     loan_date = date.today().isoformat()
     due_date = (date.today() + timedelta(days=LOAN_DAYS)).isoformat()
     with open(LOANS_FILE, 'a', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
         writer.writerow([loan_id, item_id, user_name, loan_date, due_date, '', '0', '0', '0', ''])
+    
+    # ========== اصلاح بخش حذف رزرو ==========
+    # حذف از صف رزرو اگر کاربر قبلاً رزرو کرده بود (با تطبیق بهتر نام)
+    reserves = []
+    with open(RESERVES_FILE, newline='', encoding='utf-8') as f:
+        reader = csv.reader(f)
+        header_res = next(reader)
+        reserves = list(reader)
+    
+    updated = False
+    for i, res in enumerate(reserves):
+        if len(res) > 4 and int(res[1]) == item_id and res[2].strip().lower() == user_name.strip().lower() and res[4] == 'active':
+            reserves[i][4] = 'completed'
+            updated = True
+            break
+    
+    if updated:
+        with open(RESERVES_FILE, 'w', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+            writer.writerow(header_res)
+            writer.writerows(reserves)
+    # ========================================
     
     return jsonify({'status': 'ok', 'due_date': due_date})
 
