@@ -1,16 +1,25 @@
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, session, redirect, url_for
 import csv
 import os
 from datetime import date, datetime, timedelta
 
 app = Flask(__name__)
+app.secret_key = 'my_secret_key_123'
+
+# تنظیمات فایل‌ها
 CSV_FILE = 'data.csv'
 LOANS_FILE = 'loans.csv'
 RESERVES_FILE = 'reserves.csv'
+USERS_FILE = 'librarians.csv'
+REPORTS_FILE = 'daily_reports.csv'
 DAILY_FINE = 1000
 LOAN_DAYS = 7
 
+# ------------------------------------------------------------
+# توابع کمکی
+# ------------------------------------------------------------
 def ensure_files():
+    """ایجاد فایل‌های CSV در صورت عدم وجود"""
     if not os.path.exists(CSV_FILE):
         with open(CSV_FILE, 'w', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
@@ -23,6 +32,14 @@ def ensure_files():
         with open(RESERVES_FILE, 'w', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
             writer.writerow(['id', 'item_id', 'user_name', 'reserve_date', 'status', 'notified'])
+    if not os.path.exists(USERS_FILE):
+        with open(USERS_FILE, 'w', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+            writer.writerow(['id', 'full_name', 'username', 'password', 'join_date'])
+    if not os.path.exists(REPORTS_FILE):
+        with open(REPORTS_FILE, 'w', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+            writer.writerow(['id', 'user_id', 'username', 'login_time', 'logout_time', 'daily_work', 'date'])
 
 ensure_files()
 
@@ -41,6 +58,7 @@ def clean_date(date_str):
     return date_str.split('T')[0]
 
 def get_reserve_queue(item_id):
+    """دریافت صف انتظار رزرو برای یک کتاب خاص (مرتب‌سازی بر اساس تاریخ)"""
     queue = []
     with open(RESERVES_FILE, newline='', encoding='utf-8') as f:
         reader = csv.DictReader(f)
@@ -50,9 +68,107 @@ def get_reserve_queue(item_id):
     queue.sort(key=lambda x: x['reserve_date'])
     return queue
 
+# ------------------------------------------------------------
+# مسیرهای لاگین، ثبت‌نام و احراز هویت
+# ------------------------------------------------------------
+@app.route('/login')
+def login_page():
+    return send_from_directory('.', 'login.html')
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        full_name = request.form['full_name'].strip()
+        username = request.form['username'].strip()
+        password = request.form['password'].strip()
+        
+        if not full_name or not username or not password:
+            return "<script>alert('همه فیلدها را پر کنید'); location.href='/register';</script>"
+        
+        # بررسی تکراری نبودن نام کاربری
+        with open(USERS_FILE, newline='', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                if row['username'] == username:
+                    return "<script>alert('این نام کاربری قبلاً ثبت شده است'); location.href='/register';</script>"
+        
+        new_id = get_next_id(USERS_FILE)
+        join_date = date.today().isoformat()
+        with open(USERS_FILE, 'a', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+            writer.writerow([new_id, full_name, username, password, join_date])
+        
+        return "<script>alert('ثبت‌نام با موفقیت انجام شد. حالا وارد شوید.'); location.href='/login';</script>"
+    
+    return send_from_directory('.', 'register.html')
+
+@app.route('/do_login', methods=['POST'])
+def do_login():
+    username = request.form['username']
+    password = request.form['password']
+    
+    with open(USERS_FILE, newline='', encoding='utf-8') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            if row['username'] == username and row['password'] == password:
+                session['logged_in'] = True
+                session['username'] = username
+                session['full_name'] = row['full_name']
+                session['user_id'] = row['id']
+                
+                # ثبت ساعت ورود
+                login_time = datetime.now().strftime('%H:%M:%S')
+                today = date.today().isoformat()
+                report_id = get_next_id(REPORTS_FILE)
+                with open(REPORTS_FILE, 'a', newline='', encoding='utf-8') as f:
+                    writer = csv.writer(f)
+                    writer.writerow([report_id, row['id'], username, login_time, '', '', today])
+                
+                return redirect('/')
+    
+    return "<script>alert('نام کاربری یا رمز عبور اشتباه است'); location.href='/login';</script>"
+
+@app.route('/logout', methods=['POST'])
+def logout():
+    if session.get('logged_in'):
+        username = session.get('username')
+        daily_work = request.form.get('daily_work', '').strip()
+        logout_time = datetime.now().strftime('%H:%M:%S')
+        today = date.today().isoformat()
+        
+        # بروزرسانی آخرین رکورد این کاربر امروز
+        reports = []
+        with open(REPORTS_FILE, newline='', encoding='utf-8') as f:
+            reader = csv.reader(f)
+            header = next(reader)
+            reports = list(reader)
+        
+        for i, row in enumerate(reports):
+            if row[2] == username and row[6] == today and row[4] == '':
+                reports[i][4] = logout_time
+                reports[i][5] = daily_work
+                break
+        
+        with open(REPORTS_FILE, 'w', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+            writer.writerow(header)
+            writer.writerows(reports)
+    
+    session.clear()
+    return redirect('/login')
+
+# ------------------------------------------------------------
+# مسیرهای اصلی پروژه
+# ------------------------------------------------------------
 @app.route('/')
 def index():
+    if not session.get('logged_in'):
+        return redirect('/login')
     return send_from_directory('.', 'index.html')
+
+@app.route('/check')
+def check_status():
+    return send_from_directory('.', 'check_status.html')
 
 @app.route('/items')
 def get_items():
@@ -91,7 +207,6 @@ def borrow():
     if not user_name:
         return jsonify({'status': 'error', 'message': 'نام امانت‌گیرنده الزامی است'})
     
-    # خواندن کتاب‌ها
     rows = []
     with open(CSV_FILE, newline='', encoding='utf-8') as f:
         reader = csv.reader(f)
@@ -111,14 +226,12 @@ def borrow():
     if available <= 0:
         return jsonify({'status': 'error', 'message': 'موجودی کافی نیست'})
     
-    # کاهش موجودی
     rows[item_idx][3] = str(available - 1)
     with open(CSV_FILE, 'w', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
         writer.writerow(header)
         writer.writerows(rows)
     
-    # ثبت امانت
     loan_id = get_next_id(LOANS_FILE)
     loan_date = date.today().isoformat()
     due_date = (date.today() + timedelta(days=LOAN_DAYS)).isoformat()
@@ -126,8 +239,7 @@ def borrow():
         writer = csv.writer(f)
         writer.writerow([loan_id, item_id, user_name, loan_date, due_date, '', '0', '0', '0', ''])
     
-    # ========== اصلاح بخش حذف رزرو ==========
-    # حذف از صف رزرو اگر کاربر قبلاً رزرو کرده بود (با تطبیق بهتر نام)
+    # حذف از صف رزرو (رفع باگ)
     reserves = []
     with open(RESERVES_FILE, newline='', encoding='utf-8') as f:
         reader = csv.reader(f)
@@ -146,7 +258,6 @@ def borrow():
             writer = csv.writer(f)
             writer.writerow(header_res)
             writer.writerows(reserves)
-    # ========================================
     
     return jsonify({'status': 'ok', 'due_date': due_date})
 
@@ -418,5 +529,69 @@ def get_reservations():
                 })
     return jsonify(reserves)
 
+# ------------------------------------------------------------
+# مسیرهای جدید برای مدیریت کتابداران و گزارش‌ها
+# ------------------------------------------------------------
+@app.route('/get_librarians')
+def get_librarians():
+    librarians = []
+    with open(USERS_FILE, newline='', encoding='utf-8') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            librarians.append({
+                'id': row['id'],
+                'full_name': row['full_name'],
+                'username': row['username'],
+                'join_date': row['join_date']
+            })
+    return jsonify(librarians)
+
+@app.route('/get_today_reports')
+def get_today_reports():
+    today = date.today().isoformat()
+    reports = []
+    with open(REPORTS_FILE, newline='', encoding='utf-8') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            if row['date'] == today:
+                reports.append({
+                    'username': row['username'],
+                    'login_time': row['login_time'],
+                    'logout_time': row['logout_time'],
+                    'daily_work': row['daily_work']
+                })
+    return jsonify(reports)
+
+# ------------------------------------------------------------
+# مسیر حذف کتاب
+# ------------------------------------------------------------
+@app.route('/delete_item/<int:item_id>')
+def delete_item(item_id):
+    # بررسی امانت فعال
+    with open(LOANS_FILE, newline='', encoding='utf-8') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            if int(row['item_id']) == item_id and row['return_date'] == '':
+                return "<script>alert('این کتاب در امانت فعال دارد و قابل حذف نیست'); location.href='/';</script>"
+    
+    # حذف از فایل data.csv
+    rows = []
+    with open(CSV_FILE, newline='', encoding='utf-8') as f:
+        reader = csv.reader(f)
+        header = next(reader)
+        rows = list(reader)
+    
+    new_rows = [row for row in rows if int(row[0]) != item_id]
+    
+    with open(CSV_FILE, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f)
+        writer.writerow(header)
+        writer.writerows(new_rows)
+    
+    return "<script>alert('کتاب با موفقیت حذف شد'); location.href='/';</script>"
+
+# ------------------------------------------------------------
+# راه‌اندازی سرور
+# ------------------------------------------------------------
 if __name__ == '__main__':
     app.run(debug=True)
